@@ -54,7 +54,7 @@ void rainbow(int range)
   for( int i = 0; i < NUM_LEDS; i++) {
       if(i < range){
         leds[getIndex(i)] = hsv;
-        hsv.hue += 2;
+        hsv.hue += 1;
       } else {
         leds[getIndex(i)] = CRGB::Black;
       }

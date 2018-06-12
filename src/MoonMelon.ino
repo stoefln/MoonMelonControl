@@ -24,7 +24,15 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
+// OTA Updates
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
+#include "Eprom.h"
+
+// sensor signal filtering
 #include <Filters.h>
+
+#include "Utils.h"
 
 FASTLED_USING_NAMESPACE
 
@@ -44,6 +52,10 @@ long lastReconnectAttempt = 0;
 
 /********** MQTT *************/
 const char* MQTT_TOPIC = "sensor";
+const char* MQTT_TOPIC_STATUS = "status";
+
+/********** OTA Update *************/
+bool otaUpdate = false;
 
 /********* JSON CONFIG *************/
 const int BUFFER_SIZE = JSON_OBJECT_SIZE(10);
@@ -81,11 +93,14 @@ FilterOnePole lowpassFilter( LOWPASS, 100.0 );
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+Eprom eprom;
+
 long lastMsg = 0;
 char msg[50];
 int value = 0;
 
 void setup() {
+  eprom.begin();
   pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
   Serial.begin(9600);
   setup_wifi();
@@ -115,8 +130,7 @@ void setup_wifi() {
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
-  String mac = WiFi.macAddress();
-  mac.toCharArray(macAddress, 20);
+  WiFi.macAddress().toCharArray(macAddress, 20);
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -154,6 +168,12 @@ bool processJson(char* message) {
       stateOn = false;
     }
   }
+  if (root.containsKey("command")){
+    const char* command = root["command"];
+    if (strcmp(command, "patch") == 0) {
+      otaUpdate = true;
+    }
+  }
 
   return true;
 }
@@ -180,8 +200,13 @@ void loop() {
       }
     }
   } else {
-    // Client connected    
-    
+    // Client connected   
+    if(otaUpdate) {
+      setColor(100, 0, 0);
+      FastLED.show(); 
+      patchFirmware();
+      otaUpdate = false;
+    }
   }
   loopsPerSek++;
   EVERY_N_MILLISECONDS( 5000 ) { // measure performance: currently we have 37000 loops per sek
@@ -205,8 +230,6 @@ void loop() {
       //FastLED.setBrightness(brightness);
       EVERY_N_MILLISECONDS( 500 ) {
         publishSensorVal(mappedSensorVal);
-        //    Serial.print(" ");
-        //    Serial.print(lowpassFilter.input(inputVal ));
       }
     }  else { // hearbeat -> just send 0 values to the server
       EVERY_N_MILLISECONDS( 3000 ) {

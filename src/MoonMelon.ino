@@ -69,11 +69,12 @@ CRGB leds[NUM_LEDS];
 #define BRIGHTNESS          96
 #define FRAMES_PER_SECOND  120
 
+CRGBPalette16 currentPalette = OceanColors_p;
+int startIndex = 0;
+
 // fire effect
 bool gReverseDirection = false;
 
-// rainbow
-uint8_t gHue = 0;
 
 // on - off
 bool stateOn = false;
@@ -253,15 +254,28 @@ void loop() {
     if(stateOn){
       int range = constrain(map(inputVal, SENSOR_MIN, SENSOR_MAX, 1, NUM_LEDS), 1, NUM_LEDS);
       rainbow(range);
-      gHue++;
-    } else {
-      setColor(0, 0, 30);
+      darken();
+    } 
+    //setColor(0, 0, 30);
+    static uint8_t startIndex = 0;
+    //startIndex = startIndex + 1;
+    //fillLEDsFromPaletteColors( startIndex);
+    //FastLED.show(); // display this frame
+    darken();
+    if(random(100) == 1){
+      randomSeed();
     }
+  
     FastLED.show(); // display this frame
   }
 
-  
+  EVERY_N_MILLISECONDS( 1000 ) { 
+    
+    //startIndex += 1;
+  }
+
 }
+
 
 void publishSensorVal(int sensorVal) {
   snprintf (msg, 75, "{\"k\":\"%s\",\"v\":\"%d\"}", macAddress, mappedSensorVal);

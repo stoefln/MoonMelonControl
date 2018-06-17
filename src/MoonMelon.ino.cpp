@@ -1,22 +1,7 @@
-/*
-  Start Mosquitto MQTT server with
-  $ /usr/local/Cellar/mosquitto/1.4.14_2/sbin/mosquitto
-  -------------------------------- 
-  NodeMcu IO Index          = Esp8266 GPIO
-  static const uint8_t D0   = 16;
-  static const uint8_t D1   = 5;
-  static const uint8_t D2   = 4;
-  static const uint8_t D3   = 0;
-  static const uint8_t D4   = 2;
-  static const uint8_t D5   = 14;
-  static const uint8_t D6   = 12;
-  static const uint8_t D7   = 13;
-  static const uint8_t D8   = 15;
-  static const uint8_t D9   = 3;
-  static const uint8_t D10  = 1;
-
-*/
-
+# 1 "/var/folders/5h/gsjh01jn2079222pq9p4yhsr0000gn/T/tmpxzXhM5"
+#include <Arduino.h>
+# 1 "/Users/steph/Documents/PlatformIO/Projects/Moon Melon/src/MoonMelon.ino"
+# 20 "/Users/steph/Documents/PlatformIO/Projects/Moon Melon/src/MoonMelon.ino"
 #define FASTLED_INTERRUPT_RETRY_COUNT 0
 #include <ESP8266WiFi.h>
 #include "FastLED.h"
@@ -24,12 +9,12 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-// OTA Updates
+
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 #include "Eprom.h"
 
-// sensor signal filtering
+
 #include <Filters.h>
 
 #include "Utils.h"
@@ -40,47 +25,47 @@ FASTLED_USING_NAMESPACE
 #warning "Requires FastLED 3.1 or later; check github for latest code."
 #endif
 
-/********** WIFI *************/
+
 const char* ssid = "Chaos-Platz";
 const char* password = "FalafelPower69";
 const char* MQTT_SERVER_IP = "192.168.0.73";
-//const char* ssid = "UPC1374847";
-//const char* password = "HHYPUMFP";
-//const char* MQTT_SERVER_IP = "192.168.0.27";
+
+
+
 char macAddress[20];
 long lastReconnectAttempt = 0;
 bool offlineMode = false;
 
-/********** MQTT *************/
+
 const char* MQTT_TOPIC = "sensor";
 const char* MQTT_TOPIC_STATUS = "status";
 
-/********** OTA Update *************/
+
 bool otaUpdate = false;
 
-/********* JSON CONFIG *************/
-const int BUFFER_SIZE = JSON_OBJECT_SIZE(10);
-/********** LED CONFIG *************/
-#define DATA_PIN    4 // working on nodeMcu V3: D2=GPIO4, GPIO4 // not working on nodeMcu V3: D0=GPIO16, D1=GPIO5, D3=GPIO0
-#define LED_TYPE    WS2812
-#define COLOR_ORDER GRB
-#define NUM_LEDS    60
-CRGB leds[NUM_LEDS];
-#define BRIGHTNESS          96
-#define FRAMES_PER_SECOND  120
 
-// fire effect
+const int BUFFER_SIZE = JSON_OBJECT_SIZE(10);
+
+#define DATA_PIN 4
+#define LED_TYPE WS2812
+#define COLOR_ORDER GRB
+#define NUM_LEDS 60
+CRGB leds[NUM_LEDS];
+#define BRIGHTNESS 96
+#define FRAMES_PER_SECOND 120
+
+
 bool gReverseDirection = false;
 
-// rainbow
+
 uint8_t gHue = 0;
 
-// on - off
+
 bool stateOn = false;
 int brightness = 0;
-/********** LED CONFIG END *************/
 
-/********** SENSOR *************/
+
+
 int SENSOR_MIN = 250;
 int SENSOR_MAX = 900;
 int inputVal = 0;
@@ -88,8 +73,8 @@ int mappedSensorVal = 0;
 float distance = 0;
 int lastInputVal = 0;
 long lastSensorUpdate = 0;
-FilterOnePole lowpassFilter( LOWPASS, 100.0 );  
-/********** SENSOR *************/
+FilterOnePole lowpassFilter( LOWPASS, 100.0 );
+
 
 
 WiFiClient wifiClient;
@@ -99,7 +84,18 @@ Eprom eprom;
 long lastMsg = 0;
 char msg[50];
 int value = 0;
-
+void setup();
+void setup_wifi();
+void callback(char* topic, byte* payload, unsigned int length);
+bool processJson(char* message);
+boolean reconnect();
+void loop();
+void publishSensorVal(int sensorVal);
+void Fire2012();
+void rainbow(int range);
+int getIndex(int i);
+void setColor(int inR, int inG, int inB);
+#line 103 "/Users/steph/Documents/PlatformIO/Projects/Moon Melon/src/MoonMelon.ino"
 void setup() {
   eprom.begin();
   Serial.begin(9600);
@@ -114,7 +110,7 @@ void setup() {
 void setup_wifi() {
 
   delay(10);
-  // We start by connecting to a WiFi network
+
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -156,7 +152,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-/********************************** START PROCESS JSON*****************************************/
+
 bool processJson(char* message) {
   StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
 
@@ -198,7 +194,7 @@ void loop() {
     long now = millis();
     if (now - lastReconnectAttempt > 5 * 1000 && !offlineMode) {
       lastReconnectAttempt = now;
-      // Attempt to reconnect
+
       if (reconnect()) {
         lastReconnectAttempt = 0;
         Serial.println("Connected!");
@@ -207,39 +203,39 @@ void loop() {
       }
     }
   } else {
-    // Client connected   
+
     if(otaUpdate) {
       setColor(100, 0, 0);
-      FastLED.show(); 
+      FastLED.show();
       patchFirmware();
       otaUpdate = false;
     }
   }
   client.loop();
   loopsPerSek++;
-  EVERY_N_MILLISECONDS( 5000 ) { // measure performance: currently we have 37000 loops per sek
+  EVERY_N_MILLISECONDS( 5000 ) {
     Serial.print("loops per sek: ");Serial.println(loopsPerSek / 5);
     loopsPerSek = 0;
   }
- 
-  EVERY_N_MILLISECONDS( 10 ) { // 100Hz sampling rate
-    inputVal = lowpassFilter.input(analogRead(A0)); 
-    
+
+  EVERY_N_MILLISECONDS( 10 ) {
+    inputVal = lowpassFilter.input(analogRead(A0));
+
     mappedSensorVal = map(inputVal, SENSOR_MIN, SENSOR_MAX, 0, 100);
-    if(inputVal - lastInputVal > 200) { // instant ON signal, is sent imediatelly
+    if(inputVal - lastInputVal > 200) {
       publishSensorVal(mappedSensorVal);
       stateOn = true;
-    } else if(inputVal - lastInputVal < -150) { // instant OFF signal
+    } else if(inputVal - lastInputVal < -150) {
       publishSensorVal(mappedSensorVal);
       stateOn = false;
-    } else if(inputVal > SENSOR_MIN){ // continuous values as long as input is above a certain treshold
+    } else if(inputVal > SENSOR_MIN){
       stateOn = true;
-      //brightness = map(inputVal, SENSOR_MIN, SENSOR_MAX, 0, 100);
-      //FastLED.setBrightness(brightness);
+
+
       EVERY_N_MILLISECONDS( 500 ) {
         publishSensorVal(mappedSensorVal);
       }
-    }  else { // hearbeat -> just send 0 values to the server
+    } else {
       EVERY_N_MILLISECONDS( 3000 ) {
         publishSensorVal(mappedSensorVal);
       }
@@ -247,9 +243,9 @@ void loop() {
     }
     lastInputVal = inputVal;
   }
-  
-  EVERY_N_MILLISECONDS( 20 ) { 
-  
+
+  EVERY_N_MILLISECONDS( 20 ) {
+
     if(stateOn){
       int range = constrain(map(inputVal, SENSOR_MIN, SENSOR_MAX, 1, NUM_LEDS), 1, NUM_LEDS);
       rainbow(range);
@@ -257,10 +253,10 @@ void loop() {
     } else {
       setColor(0, 0, 30);
     }
-    FastLED.show(); // display this frame
+    FastLED.show();
   }
 
-  
+
 }
 
 void publishSensorVal(int sensorVal) {
@@ -269,5 +265,82 @@ void publishSensorVal(int sensorVal) {
   if(!offlineMode){
     client.publish(MQTT_TOPIC, msg);
     client.loop();
+  }
+}
+# 1 "/Users/steph/Documents/PlatformIO/Projects/Moon Melon/src/LedAnimations.ino"
+
+#define COOLING 55
+
+
+
+
+#define SPARKING 200
+
+void Fire2012()
+{
+  int sparking = (int) ((float) SPARKING * (float) brightness / 100.0);
+
+  static byte heat[NUM_LEDS];
+
+
+    for( int i = 0; i < NUM_LEDS; i++) {
+      heat[i] = qsub8( heat[i], random8(0, ((COOLING * 10) / NUM_LEDS) + 2));
+    }
+
+
+    for( int k= NUM_LEDS - 1; k >= 2; k--) {
+      heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
+    }
+
+
+    if( random8() < sparking ) {
+      int y = random8(7);
+      heat[y] = qadd8( heat[y], random8(160,255) );
+    }
+
+
+    for( int j = 0; j < NUM_LEDS; j++) {
+      CRGB color = HeatColor( heat[j]);
+      int pixelnumber;
+      if( gReverseDirection ) {
+        pixelnumber = (NUM_LEDS-1) - j;
+      } else {
+        pixelnumber = j;
+      }
+      leds[pixelnumber] = color;
+    }
+}
+
+
+
+void rainbow(int range)
+{
+
+
+  CHSV hsv;
+  hsv.hue = range * 3;
+  hsv.val = 255;
+  hsv.sat = 240;
+  for( int i = 0; i < NUM_LEDS; i++) {
+      if(i < range){
+        leds[getIndex(i)] = hsv;
+        hsv.hue += 1;
+      } else {
+        leds[getIndex(i)] = CRGB::Black;
+      }
+  }
+}
+
+int getIndex(int i)
+{
+
+  return i;
+}
+# 1 "/Users/steph/Documents/PlatformIO/Projects/Moon Melon/src/LedControl.ino"
+void setColor(int inR, int inG, int inB) {
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[i].red = inR;
+    leds[i].green = inG;
+    leds[i].blue = inB;
   }
 }

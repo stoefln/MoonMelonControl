@@ -65,6 +65,7 @@ const int BUFFER_SIZE = JSON_OBJECT_SIZE(10);
 #define LED_TYPE    WS2812
 #define COLOR_ORDER GRB
 #define NUM_LEDS    60
+#define LEDS_PER_RING 12
 CRGB leds[NUM_LEDS];
 #define BRIGHTNESS          96
 #define FRAMES_PER_SECOND  120
@@ -187,8 +188,10 @@ bool processJson(char* message) {
 }
 
 boolean reconnect() {
-  if (client.connect("arduinoClient")) {
-    client.subscribe("inTopic");
+  char clientId[30];
+  sprintf(clientId, "moonMelon%s", macAddress);
+  if (client.connect(clientId)) {
+    client.subscribe("sensorControl");
   }
   return client.connected();
 }
@@ -223,24 +226,28 @@ void loop() {
     loopsPerSek = 0;
   }
  
-  EVERY_N_MILLISECONDS( 10 ) { // 100Hz sampling rate
-    inputVal = lowpassFilter.input(analogRead(A0)); 
-    
+  EVERY_N_MILLISECONDS( 200 ) { // 100Hz sampling rate
+    int rawInput = analogRead(A0);
+    inputVal = lowpassFilter.input(rawInput); 
+    int TRIGGER_LEVEL = 8;
     mappedSensorVal = map(inputVal, SENSOR_MIN, SENSOR_MAX, 0, 100);
-    if(inputVal - lastInputVal > 200) { // instant ON signal, is sent imediatelly
-      publishSensorVal(mappedSensorVal);
-      stateOn = true;
-    } else if(inputVal - lastInputVal < -150) { // instant OFF signal
-      publishSensorVal(mappedSensorVal);
-      stateOn = false;
-    } else if(inputVal > SENSOR_MIN){ // continuous values as long as input is above a certain treshold
-      stateOn = true;
-      //brightness = map(inputVal, SENSOR_MIN, SENSOR_MAX, 0, 100);
-      //FastLED.setBrightness(brightness);
-      EVERY_N_MILLISECONDS( 500 ) {
+
+    
+    Serial.println(rawInput);
+    
+    if(mappedSensorVal > TRIGGER_LEVEL) { // instant ON signal, is sent imediatelly
+      if(!stateOn){
         publishSensorVal(mappedSensorVal);
       }
-    }  else { // hearbeat -> just send 0 values to the server
+      EVERY_N_MILLISECONDS( 300 ) {
+        publishSensorVal(mappedSensorVal);
+      }
+      //publishSensorVal(mappedSensorVal);
+      stateOn = true;
+    } else { // hearbeat -> just send 0 values to the server
+      if(stateOn){
+        publishSensorVal(mappedSensorVal);
+      }
       EVERY_N_MILLISECONDS( 3000 ) {
         publishSensorVal(mappedSensorVal);
       }
@@ -249,22 +256,26 @@ void loop() {
     lastInputVal = inputVal;
   }
   
+  EVERY_N_MILLISECONDS( 5000 ) { 
+    randomRing();
+  }
   EVERY_N_MILLISECONDS( 20 ) { 
   
     if(stateOn){
       int range = constrain(map(inputVal, SENSOR_MIN, SENSOR_MAX, 1, NUM_LEDS), 1, NUM_LEDS);
-      rainbow(range);
-      darken();
-    } 
+      //rainbow(range);
+    } else {
+      if(random(500) == 1){
+        //randomRing();
+      }
+    }
+    darken();
     //setColor(0, 0, 30);
     static uint8_t startIndex = 0;
     //startIndex = startIndex + 1;
     //fillLEDsFromPaletteColors( startIndex);
     //FastLED.show(); // display this frame
-    darken();
-    if(random(100) == 1){
-      randomSeed();
-    }
+    
   
     FastLED.show(); // display this frame
   }

@@ -43,13 +43,36 @@ void Fire2012()
     }
 }
 void darken(){
-  CRGB sub = CRGB( 10, 1, 1);
+  CRGB sub = CRGB( 2, 2, 2);
   for( int i = 0; i < NUM_LEDS; i++) {
     leds[i] -= sub;
   }
 }
 void randomSeed(){
   leds[random(0, NUM_LEDS - 1)] = CRGB(random(0,255), random(0,255), random(0,255));
+}
+void randomRing(){
+  int ringIndex = random(0,3);
+  setRing(0, random(0,255), random(0,255), random(0,255));
+  setRing(1, random(0,255), random(0,255), random(0,255));
+  setRing(2, random(0,255), random(0,255), random(0,255));
+  setRing(3, random(0,255), random(0,255), random(0,255));
+  setRing(4, random(0,255), random(0,255), random(0,255));
+}
+void setRing(int index, int inR, int inG, int inB) {
+  for(uint8_t i = index * LEDS_PER_RING; i < index * LEDS_PER_RING + LEDS_PER_RING; i++){
+    leds[i].red   = inR;
+    leds[i].green = inG;
+    leds[i].blue  = inB;
+  }
+}
+
+void setColor(int inR, int inG, int inB) {
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[i].red   = inR;
+    leds[i].green = inG;
+    leds[i].blue  = inB;
+  }
 }
 
 void fillLEDsFromPaletteColors( uint8_t colorIndex)
@@ -76,7 +99,7 @@ void rainbow(int range)
         leds[getIndex(i)] += hsv;
         hsv.hue += 1;
       } else {
-        //leds[getIndex(i)] = CRGB::Black;
+        //leds[getIndex(i)] -= CRGB::Black;
       }
   }
 }

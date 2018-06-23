@@ -53,10 +53,7 @@ void randomSeed(){
 }
 void randomRing(){
   int ringIndex = random(0,3);
-  setRing(0, random(0,255), random(0,255), random(0,255));
-  setRing(1, random(0,255), random(0,255), random(0,255));
-  setRing(2, random(0,255), random(0,255), random(0,255));
-  setRing(3, random(0,255), random(0,255), random(0,255));
+  setRing(0, 0, 0, 255);
   setRing(4, random(0,255), random(0,255), random(0,255));
 }
 void setRing(int index, int inR, int inG, int inB) {
@@ -96,10 +93,10 @@ void rainbow(int range)
   hsv.sat = 240;
   for( int i = 0; i < NUM_LEDS; i++) {
       if(i < range){
-        leds[getIndex(i)] += hsv;
+        leds[getIndex(i)] = hsv;
         hsv.hue += 1;
       } else {
-        //leds[getIndex(i)] -= CRGB::Black;
+        leds[getIndex(i)] = CRGB::Black;
       }
   }
 }

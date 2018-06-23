@@ -2,10 +2,10 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 
-void patchFirmware() {
-  Serial.println("patchFirmware2...");
-  t_httpUpdate_return ret = ESPhttpUpdate.update("http://192.168.0.164:8000/Firmware/moon_melon.bin");
-  Serial.println("patchFirmware done.");
+void patchFirmware(const String& url) {
+  Serial.print("trying to download patch from "); Serial.print(url); Serial.println("...");
+  t_httpUpdate_return ret = ESPhttpUpdate.update(url);
+  Serial.print("result: ");Serial.println(ret);
 
   switch (ret) {
     case HTTP_UPDATE_FAILED:

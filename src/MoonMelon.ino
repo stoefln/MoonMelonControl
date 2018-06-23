@@ -41,15 +41,21 @@ FASTLED_USING_NAMESPACE
 #endif
 
 /********** WIFI *************/
-const char* ssid = "Chaos-Platz";
-const char* password = "FalafelPower69";
-const char* MQTT_SERVER_IP = "192.168.0.73";
-//const char* ssid = "UPC1374847";
-//const char* password = "HHYPUMFP";
-//const char* MQTT_SERVER_IP = "192.168.0.27";
+const char* SSID1 = "MoonMelonField";
+const char* WIFI_PASSWORD1 = "moonsalon";
+const char* MQTT_SERVER_IP1 = "192.168.1.100";
+const char* SSID2 = "Chaos-Platz";
+const char* WIFI_PASSWORD2 = "FalafelPower69";
+const char* MQTT_SERVER_IP2 = "192.168.0.73";
+
+//const char* SSID2 = "UPC1374847";
+//const char* WIFI_PASSWORD2 = "HHYPUMFP";
+//const char* MQTT_SERVER_IP2 = "192.168.0.27";
 char macAddress[20];
 long lastReconnectAttempt = 0;
 bool offlineMode = false;
+// fallback solution: if wifi with SSID1 is not reachable, connect to wifi with SSID2
+int currentNetworkIndex = 0;
 
 /********** MQTT *************/
 const char* MQTT_TOPIC = "sensor";
@@ -57,6 +63,7 @@ const char* MQTT_TOPIC_STATUS = "status";
 
 /********** OTA Update *************/
 bool otaUpdate = false;
+String otaUpdateUrl = "";
 
 /********* JSON CONFIG *************/
 const int BUFFER_SIZE = JSON_OBJECT_SIZE(10);
@@ -67,7 +74,6 @@ const int BUFFER_SIZE = JSON_OBJECT_SIZE(10);
 #define NUM_LEDS    60
 #define LEDS_PER_RING 12
 CRGB leds[NUM_LEDS];
-#define BRIGHTNESS          96
 #define FRAMES_PER_SECOND  120
 
 CRGBPalette16 currentPalette = OceanColors_p;
@@ -79,13 +85,14 @@ bool gReverseDirection = false;
 
 // on - off
 bool stateOn = false;
-int brightness = 0;
+uint8_t brightness = 96;
 /********** LED CONFIG END *************/
 
 /********** SENSOR *************/
-int SENSOR_MIN = 250;
+int SENSOR_MIN = 100;
 int SENSOR_MAX = 900;
 int inputVal = 0;
+int sensorTiggerLevel = 180;
 int mappedSensorVal = 0;
 float distance = 0;
 int lastInputVal = 0;
@@ -105,23 +112,29 @@ int value = 0;
 void setup() {
   eprom.begin();
   Serial.begin(9600);
-  setup_wifi();
-  client.setServer(MQTT_SERVER_IP, 1883);
+  setupWifi();
+  if(currentNetworkIndex == 0){
+    client.setServer(MQTT_SERVER_IP1, 1883);
+  } else {
+    client.setServer(MQTT_SERVER_IP2, 1883);
+  }
   client.setCallback(callback);
 
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
-  FastLED.setBrightness(BRIGHTNESS);
+  FastLED.setBrightness(brightness);
 }
 
-void setup_wifi() {
-
+void setupWifi() {
   delay(10);
-  // We start by connecting to a WiFi network
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+  Serial.println(); 
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
-  WiFi.begin(ssid, password);
+  if(currentNetworkIndex == 0){
+    Serial.print("Connecting to "); Serial.println(SSID1);
+    WiFi.begin(SSID1, WIFI_PASSWORD1);
+  } else {
+    Serial.print("Connecting to "); Serial.println(SSID2);
+    WiFi.begin(SSID2, WIFI_PASSWORD2);
+  }
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
   int i= 0;
   while (WiFi.status() != WL_CONNECTED) {
@@ -129,9 +142,15 @@ void setup_wifi() {
     Serial.print(".");
     i++;
     if(i > 20) {
-      Serial.println("Connection could not be established, continue with no-internet mode");
-      offlineMode = true;
-      break;
+      if(currentNetworkIndex == 0){ // try the other network
+        Serial.println("Connection could not be established, trying fallback network...");
+        currentNetworkIndex++;
+        setupWifi();
+      } else {
+        Serial.println("Connection could not be established, continue with no-internet mode...");
+        offlineMode = true;  
+      }
+      return;
     }
   }
 
@@ -177,10 +196,17 @@ bool processJson(char* message) {
       stateOn = false;
     }
   }
+
   if (root.containsKey("command")){
     const char* command = root["command"];
     if (strcmp(command, "patch") == 0) {
       otaUpdate = true;
+      otaUpdateUrl = String(root["url"].as<char*>()); // http://192.168.0.164:8000/Firmware/moon_melon.bin
+    } else if (strcmp(command, "setTriggerLevel") == 0) {
+      sensorTiggerLevel = root["val"];
+      Serial.print("set new trigger level"); Serial.println(sensorTiggerLevel);
+    } else if (strcmp(command, "setBrightness") == 0) {
+      brightness = root["val"];
     }
   }
 
@@ -190,8 +216,13 @@ bool processJson(char* message) {
 boolean reconnect() {
   char clientId[30];
   sprintf(clientId, "moonMelon%s", macAddress);
+  char myTopic[50];
+  sprintf(myTopic, "sensorControl%s", macAddress);
   if (client.connect(clientId)) {
     client.subscribe("sensorControl");
+    Serial.println("Subscribing to topic: sensorControl");
+    client.subscribe(myTopic);
+    Serial.print("Subscribing to topic:"); Serial.println(myTopic);
   }
   return client.connected();
 }
@@ -205,7 +236,7 @@ void loop() {
       // Attempt to reconnect
       if (reconnect()) {
         lastReconnectAttempt = 0;
-        Serial.println("Connected!");
+        publishConnected();
       } else {
         Serial.println("Connection attempt failed. next try in 5 seconds...");
       }
@@ -215,7 +246,7 @@ void loop() {
     if(otaUpdate) {
       setColor(100, 0, 0);
       FastLED.show(); 
-      patchFirmware();
+      patchFirmware(otaUpdateUrl);
       otaUpdate = false;
     }
   }
@@ -226,73 +257,75 @@ void loop() {
     loopsPerSek = 0;
   }
  
-  EVERY_N_MILLISECONDS( 200 ) { // 100Hz sampling rate
+  EVERY_N_MILLISECONDS( 10 ) { // 100Hz sampling rate
     int rawInput = analogRead(A0);
     inputVal = lowpassFilter.input(rawInput); 
-    int TRIGGER_LEVEL = 8;
     mappedSensorVal = map(inputVal, SENSOR_MIN, SENSOR_MAX, 0, 100);
-
+    //Serial.println(rawInput);
     
-    Serial.println(rawInput);
-    
-    if(mappedSensorVal > TRIGGER_LEVEL) { // instant ON signal, is sent imediatelly
+    if(inputVal > sensorTiggerLevel) { // instant ON signal, is sent imediatelly
       if(!stateOn){
-        publishSensorVal(mappedSensorVal);
+        Serial.print("stateOn. SensorTriggerLevel: "); Serial.println(sensorTiggerLevel);
+        publishSensorVal(inputVal, 1);
+        stateOn = true;
       }
-      EVERY_N_MILLISECONDS( 300 ) {
-        publishSensorVal(mappedSensorVal);
-      }
-      //publishSensorVal(mappedSensorVal);
-      stateOn = true;
-    } else { // hearbeat -> just send 0 values to the server
+    } else { 
       if(stateOn){
-        publishSensorVal(mappedSensorVal);
+        Serial.println("stateOff");
+        publishSensorVal(inputVal, 0);
+        stateOn = false;
       }
-      EVERY_N_MILLISECONDS( 3000 ) {
-        publishSensorVal(mappedSensorVal);
-      }
-      stateOn = false;
     }
     lastInputVal = inputVal;
   }
   
-  EVERY_N_MILLISECONDS( 5000 ) { 
-    randomRing();
-  }
+  
   EVERY_N_MILLISECONDS( 20 ) { 
   
     if(stateOn){
       int range = constrain(map(inputVal, SENSOR_MIN, SENSOR_MAX, 1, NUM_LEDS), 1, NUM_LEDS);
-      //rainbow(range);
+      rainbow(range);
     } else {
+      
       if(random(500) == 1){
-        //randomRing();
+        randomRing();
       }
+      darken();
     }
-    darken();
+    
     //setColor(0, 0, 30);
-    static uint8_t startIndex = 0;
+    //static uint8_t startIndex = 0;
     //startIndex = startIndex + 1;
     //fillLEDsFromPaletteColors( startIndex);
     //FastLED.show(); // display this frame
-    
+    if(brightness != FastLED.getBrightness()){
+      Serial.print("set brightness to "); Serial.println(brightness);
+      FastLED.setBrightness(brightness);
+    }
   
     FastLED.show(); // display this frame
   }
-
-  EVERY_N_MILLISECONDS( 1000 ) { 
-    
-    //startIndex += 1;
-  }
+  
 
 }
 
 
-void publishSensorVal(int sensorVal) {
-  snprintf (msg, 75, "{\"k\":\"%s\",\"v\":\"%d\"}", macAddress, mappedSensorVal);
+void publishSensorVal(int sensorVal, int trigger) {
+  // k: mac address of sensor, v: sensor value, s: above (1) or below trigger level (0)
+  snprintf (msg, 75, "{\"k\":\"%s\",\"v\":\"%d\",\"s\":%d}", macAddress, sensorVal, trigger);
   Serial.println(msg);
   if(!offlineMode){
     client.publish(MQTT_TOPIC, msg);
+    client.loop();
+  }
+}
+
+void publishConnected() {
+  // k: mac address of sensor, v: sensor value, s: above (1) or below trigger level (0)
+  snprintf (msg, 75, "{\"k\":\"%s\",\"status\":\"connected\"}", macAddress);
+  Serial.println(msg);
+  if(!offlineMode){
+    client.publish(MQTT_TOPIC_STATUS, msg);
     client.loop();
   }
 }

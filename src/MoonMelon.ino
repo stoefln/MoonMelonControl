@@ -58,6 +58,7 @@ int currentNetworkIndex = 0;
 
 /********** MQTT *************/
 const char* MQTT_TOPIC = "sensor";
+const char* MQTT_TOPIC_STATUS = "status";
 
 /********** OTA Update *************/
 bool otaUpdate = false;
@@ -82,6 +83,15 @@ bool gReverseDirection = false;
 // on - off
 bool stateOn = false;
 uint8_t brightness = 96;
+uint16_t animationProgress = 0;
+uint8_t palIndex = 0;
+uint8_t sleepModePulsatingSpeed = 2;
+
+const CRGBPalette16 WaterColors1 = CRGBPalette16(0x000000, 0x000000, 0x000000, 0x000000, 
+                                                    0x210048, 0x210048, 0x210048, 0x390083, 
+                                                    0x390083, 0x0409bf, 0x0409bf, 0x009be9,
+                                                    0x009be9, 0x00b6c1, 0x00b6c1, 0x00b6c1);
+
 /********** LED CONFIG END *************/
 
 /********** SENSOR *************/
@@ -168,10 +178,12 @@ void callback(char* mqttTopic, byte* payload, unsigned int length) {
   String topic = String(mqttTopic);
   if(topic.indexOf("set/brightness") >= 0){
     brightness = atoi(message);
-    Serial.println("parsed");
   } else if(topic.indexOf("set/triggerLevel") >= 0){
     sensorTiggerLevel = atoi(message);
-    Serial.print("set new trigger level"); Serial.println(sensorTiggerLevel);
+    Serial.print("set new trigger level "); Serial.println(sensorTiggerLevel);
+  } else if(topic.indexOf("set/sleepModePulsatingSpeed") >= 0){
+    sleepModePulsatingSpeed = atoi(message);
+    Serial.print("set sleepModePulsatingSpeed "); Serial.println(sleepModePulsatingSpeed);
   } else if(topic.indexOf("patch") >= 0){
     otaUpdate = true;
     otaUpdateUrl = String(message); // http://192.168.0.164:8000/Firmware/moon_melon.bin
@@ -262,10 +274,11 @@ void loop() {
       int range = constrain(map(inputVal, SENSOR_MIN, SENSOR_MAX, 1, NUM_LEDS), 1, NUM_LEDS);
       rainbow(range);
     } else {
-      
-      if(random(500) == 1){
+      pulsate();
+      /*if(random(500) == 1){
         randomRing();
       }
+      ;*/
       darken();
     }
     

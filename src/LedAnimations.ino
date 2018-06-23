@@ -52,11 +52,29 @@ void randomSeed(){
   leds[random(0, NUM_LEDS - 1)] = CRGB(random(0,255), random(0,255), random(0,255));
 }
 void randomRing(){
-  int ringIndex = random(0,3);
-  setRing(0, 0, 0, 255);
-  setRing(4, random(0,255), random(0,255), random(0,255));
+  //int ringIndex = random(0,3);
+  fillRing(0, 0, 0, 255);
+  fillRing(4, random(0,255), random(0,255), random(0,255));
 }
-void setRing(int index, int inR, int inG, int inB) {
+
+
+void pulsate(){
+  animationProgress = (animationProgress + sleepModePulsatingSpeed) % 10000;
+  palIndex = triwave8(map(animationProgress, 0, 10000, 0, 255));
+  fillRing(0, 0, 0, palIndex);
+  //Serial.println(palIndex);
+  CRGB color = ColorFromPalette(WaterColors1, palIndex);
+  color.fadeLightBy(120);
+  fillRing(4, color);
+}
+
+void fillRing(int index, CRGB color) {
+  for(uint8_t i = index * LEDS_PER_RING; i < index * LEDS_PER_RING + LEDS_PER_RING; i++){
+    leds[i] = color;
+  }
+}
+
+void fillRing(int index, int inR, int inG, int inB) {
   for(uint8_t i = index * LEDS_PER_RING; i < index * LEDS_PER_RING + LEDS_PER_RING; i++){
     leds[i].red   = inR;
     leds[i].green = inG;
@@ -77,7 +95,7 @@ void fillLEDsFromPaletteColors( uint8_t colorIndex)
    uint8_t brightness = 255;
   
   for( int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = ColorFromPalette( currentPalette, colorIndex + sin8(i*4), brightness);
+    leds[i] = ColorFromPalette( WaterColors1, colorIndex + sin8(i*4), brightness);
     colorIndex += 3;
   }
 }
@@ -103,7 +121,7 @@ void rainbow(int range)
 
 int getIndex(int i) 
 {
-  //return NUM_LEDS - i - 1;
-  return i;
+  return NUM_LEDS - i - 1;
+  //return i;
 }
 

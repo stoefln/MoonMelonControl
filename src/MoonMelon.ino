@@ -22,7 +22,6 @@
 #include "FastLED.h"
 #include <Filters.h>
 #include <PubSubClient.h>
-#include <ArduinoJson.h>
 
 // OTA Updates
 #include <ESP8266HTTPClient.h>
@@ -41,12 +40,12 @@ FASTLED_USING_NAMESPACE
 #endif
 
 /********** WIFI *************/
-const char* SSID1 = "MoonMelonField";
-const char* WIFI_PASSWORD1 = "moonsalon";
-const char* MQTT_SERVER_IP1 = "192.168.1.100";
-const char* SSID2 = "Chaos-Platz";
-const char* WIFI_PASSWORD2 = "FalafelPower69";
-const char* MQTT_SERVER_IP2 = "192.168.0.73";
+const char* SSID2 = "MoonMelonField";
+const char* WIFI_PASSWORD2 = "moonsalon";
+const char* MQTT_SERVER_IP2 = "192.168.1.100";
+const char* SSID1 = "Chaos-Platz";
+const char* WIFI_PASSWORD1 = "FalafelPower69";
+const char* MQTT_SERVER_IP1 = "192.168.0.73";
 
 //const char* SSID2 = "UPC1374847";
 //const char* WIFI_PASSWORD2 = "HHYPUMFP";
@@ -59,14 +58,11 @@ int currentNetworkIndex = 0;
 
 /********** MQTT *************/
 const char* MQTT_TOPIC = "sensor";
-const char* MQTT_TOPIC_STATUS = "status";
 
 /********** OTA Update *************/
 bool otaUpdate = false;
 String otaUpdateUrl = "";
 
-/********* JSON CONFIG *************/
-const int BUFFER_SIZE = JSON_OBJECT_SIZE(10);
 /********** LED CONFIG *************/
 #define DATA_PIN    4 // working on nodeMcu V3: D2=GPIO4, GPIO4 // not working on nodeMcu V3: D0=GPIO16, D1=GPIO5, D3=GPIO0
 #define LED_TYPE    WS2812
@@ -161,56 +157,25 @@ void setupWifi() {
   WiFi.macAddress().toCharArray(macAddress, 20);
 }
 
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
+void callback(char* mqttTopic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived [");Serial.print(mqttTopic); Serial.print("] ");
   char message[length + 1];
   for (uint16_t i = 0; i < length; i++) {
     message[i] = (char)payload[i];
   }
   message[length] = '\0';
   Serial.println(message);
-
-  if (!processJson(message)) {
-    return;
-  }
-}
-
-/********************************** START PROCESS JSON*****************************************/
-bool processJson(char* message) {
-  StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
-
-  JsonObject& root = jsonBuffer.parseObject(message);
-
-  if (!root.success()) {
-    Serial.println("parseObject() failed");
-    return false;
-  }
-
-  if (root.containsKey("state")) {
-    if (strcmp(root["state"], "on") == 0) {
-      stateOn = true;
-    }
-    else if (strcmp(root["state"], "off") == 0) {
-      stateOn = false;
-    }
-  }
-
-  if (root.containsKey("command")){
-    const char* command = root["command"];
-    if (strcmp(command, "patch") == 0) {
-      otaUpdate = true;
-      otaUpdateUrl = String(root["url"].as<char*>()); // http://192.168.0.164:8000/Firmware/moon_melon.bin
-    } else if (strcmp(command, "setTriggerLevel") == 0) {
-      sensorTiggerLevel = root["val"];
-      Serial.print("set new trigger level"); Serial.println(sensorTiggerLevel);
-    } else if (strcmp(command, "setBrightness") == 0) {
-      brightness = root["val"];
-    }
-  }
-
-  return true;
+  String topic = String(mqttTopic);
+  if(topic.indexOf("set/brightness") >= 0){
+    brightness = atoi(message);
+    Serial.println("parsed");
+  } else if(topic.indexOf("set/triggerLevel") >= 0){
+    sensorTiggerLevel = atoi(message);
+    Serial.print("set new trigger level"); Serial.println(sensorTiggerLevel);
+  } else if(topic.indexOf("patch") >= 0){
+    otaUpdate = true;
+    otaUpdateUrl = String(message); // http://192.168.0.164:8000/Firmware/moon_melon.bin
+  } 
 }
 
 boolean reconnect() {
@@ -219,13 +184,24 @@ boolean reconnect() {
   char myTopic[50];
   sprintf(myTopic, "sensorControl%s", macAddress);
   if (client.connect(clientId)) {
-    client.subscribe("sensorControl");
+    client.subscribe("sensorControl/#");
     Serial.println("Subscribing to topic: sensorControl");
+    
+    char myTopic[60];
+    sprintf(myTopic, "sensorControl%s/#", macAddress);
     client.subscribe(myTopic);
     Serial.print("Subscribing to topic:"); Serial.println(myTopic);
   }
   return client.connected();
 }
+
+void subscribeToOwnTopic(const char * topic){
+  char myTopic[60];
+  sprintf(myTopic, "sensorControl/%s/%s", macAddress, topic);
+  client.subscribe(myTopic);
+  Serial.print("Subscribing to topic:"); Serial.println(myTopic);
+}
+
 long loopsPerSek = 0;
 void loop() {
 

@@ -2,7 +2,6 @@
 #define COOLING  55
 
 
-
 // SPARKING: What chance (out of 255) is there that a new spark will be lit?
 // Higher chance = more roaring fire.  Lower chance = more flickery fire.
 // Default 120, suggested range 50-200.
@@ -42,8 +41,8 @@ void Fire2012()
       leds[pixelnumber] = color;
     }
 }
-void darken(){
-  CRGB sub = CRGB( 2, 2, 2);
+void darken(int amount){
+  CRGB sub = CRGB( amount, amount, amount);
   for( int i = 0; i < NUM_LEDS; i++) {
     leds[i] -= sub;
   }
@@ -62,10 +61,14 @@ void pulsate(){
   animationProgress = (animationProgress + sleepModePulsatingSpeed) % 10000;
   palIndex = triwave8(map(animationProgress, 0, 10000, 0, 255));
   fillRing(0, 0, 0, palIndex);
-  //Serial.println(palIndex);
-  CRGB color = ColorFromPalette(WaterColors1, palIndex);
-  color.fadeLightBy(120);
-  fillRing(4, color);
+  int ring = 4; // 4th ring == bottom ring
+  int add = 0;
+  for(uint8_t i = ring * LEDS_PER_RING; i < ring * LEDS_PER_RING + LEDS_PER_RING; i++){
+    leds[i] = ColorFromPalette(WaterColors1, palIndex + add, sleepModeBrightness, LINEARBLEND);
+    add++;
+  }
+  //fillRing(4, color);
+  //darken(255-sleepModeBrightness);
 }
 
 void fillRing(int index, CRGB color) {
@@ -100,13 +103,13 @@ void fillLEDsFromPaletteColors( uint8_t colorIndex)
   }
 }
 
-
 void rainbow(int range) 
 {
   // FastLED's built-in rainbow generator
   //fill_rainbow( leds, NUM_LEDS - range, gHue, 7);
+
   CHSV hsv;
-  hsv.hue = range * 3;
+  hsv.hue = range * 3 + 120;
   hsv.val = 255;
   hsv.sat = 240;
   for( int i = 0; i < NUM_LEDS; i++) {
@@ -114,7 +117,7 @@ void rainbow(int range)
         leds[getIndex(i)] = hsv;
         hsv.hue += 1;
       } else {
-        leds[getIndex(i)] = CRGB::Black;
+        leds[getIndex(i)].fadeLightBy(50);
       }
   }
 }

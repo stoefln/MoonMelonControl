@@ -1,6 +1,7 @@
 // OTA Updates
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
+#include <QueueArray.h>
 
 void patchFirmware(const String& url) {
   Serial.print("trying to download patch from "); Serial.print(url); Serial.println("...");
@@ -20,4 +21,16 @@ void patchFirmware(const String& url) {
       Serial.println("HTTP_UPDATE_OK\n");
       break;
   }
+}
+
+int getMaxQVal(QueueArray<int> & sensorQ){
+  int val = 0;
+  int maxVal = 0;
+  while(!sensorQ.isEmpty()){
+    val = sensorQ.pop();
+    if(val > maxVal){
+      maxVal = val;
+    }
+  }
+  return maxVal;
 }

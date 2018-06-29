@@ -80,10 +80,10 @@ int startIndex = 0;
 // fire effect
 bool gReverseDirection = false;
 
-
-// on - off
-bool stateOn = false;
+bool stateOn = false; // on - off
+bool switchedOff = false; //gets set to true when stateOn just went to false
 uint8_t brightness = 96;
+uint8_t fadeOutAmount = 2; // 0-255 (0-100%)
 uint16_t animationProgress = 0;
 uint8_t palIndex = 0;
 uint8_t sleepModePulsatingSpeed = 5;
@@ -154,7 +154,7 @@ void setupWifi() {
         currentNetworkIndex++;
         setupWifi();
       } else {}*/
-      setColor(100, 100, 0);
+      setColor(255, 100, 100);
       Serial.println("Connection could not be established, continue with no-internet mode...");
       delay(1000);
       FastLED.show(); 
@@ -190,6 +190,9 @@ void callback(char* mqttTopic, byte* payload, unsigned int length) {
   } else if(topic.indexOf("set/sleepModePulsatingSpeed") >= 0){
     sleepModePulsatingSpeed = atoi(message);
     Serial.print("set sleepModePulsatingSpeed "); Serial.println(sleepModePulsatingSpeed);
+  } else if(topic.indexOf("set/fadeOutAmount") >= 0){
+    fadeOutAmount = atoi(message);
+    Serial.print("set fadeOutAmount "); Serial.println(fadeOutAmount);
   } else if(topic.indexOf("blink") >= 0){
     blinkStart = millis();
     Serial.println("blink!");
@@ -272,12 +275,11 @@ void loop() {
       }
     } else { 
       if(stateOn){
-        Serial.print("stateOff maxVal: ");Serial.print(getMaxQVal(sensorQ)); Serial.print(" currentVal:"); Serial.println(inputVal);
         publishSensorVal(inputVal, 0);
+        switchedOff = true;
         stateOn = false;
       }
     }
-    lastInputVal = inputVal;
   }
   
   EVERY_N_MILLISECONDS( 20 ) { 
@@ -285,13 +287,14 @@ void loop() {
     if(stateOn){
       rainbow(mapVal(inputVal));
       lastActiveTimestamp = millis();
-    } else if(millis() - lastActiveTimestamp < 200){ // wait for a while till starting the sleep mode animation again
-      int max = getMaxQVal(sensorQ)
+    } else if(switchedOff){ 
+      int max = getMaxQVal(sensorQ);
+      //Serial.print("stateOff maxVal: ");Serial.print(max); Serial.print(" currentVal:"); Serial.println(inputVal);
       rainbow(mapVal(max));
-    } else if(millis() - lastActiveTimestamp > 5000) {
+    } else if(millis() - lastActiveTimestamp > 5000) { // wait for a while till starting the sleep mode animation again
       pulsate();
     }
-    darken(2);
+    darken(fadeOutAmount);
 
     //setColor(0, 0, 30);
     //static uint8_t startIndex = 0;
@@ -310,12 +313,12 @@ void loop() {
       }
     }
     FastLED.show(); // display this frame
+    switchedOff = false;
   }
-
 }
 
 int mapVal(int inputVal){
-  return constrain(map(inputVal, sensorTiggerLevel, SENSOR_MAX, 1, NUM_LEDS), 1, NUM_LEDS)
+  return constrain(map(inputVal, sensorTiggerLevel, SENSOR_MAX, 1, NUM_LEDS), 1, NUM_LEDS);
 }
 
 void publishSensorVal(int sensorVal, int trigger) {

@@ -42,9 +42,8 @@ void Fire2012()
     }
 }
 void darken(int amount){
-  CRGB sub = CRGB( amount, amount, amount);
   for( int i = 0; i < NUM_LEDS; i++) {
-    leds[i] -= sub;
+    leds[i].fadeToBlackBy(amount);
   }
 }
 void randomSeed(){
@@ -107,7 +106,6 @@ void rainbow(int range)
 {
   // FastLED's built-in rainbow generator
   //fill_rainbow( leds, NUM_LEDS - range, gHue, 7);
-
   CHSV hsv;
   hsv.hue = range * 3 + 120;
   hsv.val = 255;

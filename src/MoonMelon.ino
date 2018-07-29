@@ -47,6 +47,9 @@ const char* MQTT_SERVER_IP1 = "192.168.1.10";
 const char* SSID2 = "Chaos-Platz";
 const char* WIFI_PASSWORD2 = "FalafelPower69";
 const char* MQTT_SERVER_IP2 = "192.168.0.73";
+// const char* SSID1 = "GoldenOnion";
+// const char* WIFI_PASSWORD1 = "blackstar";
+// const char* MQTT_SERVER_IP1 = "192.168.43.62";
 
 //const char* SSID2 = "UPC1374847";
 //const char* WIFI_PASSWORD2 = "HHYPUMFP";
@@ -81,19 +84,26 @@ int startIndex = 0;
 bool gReverseDirection = false;
 
 bool stateOn = false; // on - off
-bool switchedOff = false; //gets set to true when stateOn just went to false
-uint8_t brightness = 96;
+bool justSwitchedOff = false; //gets set to true when stateOn just went to false
+uint8_t brightness = 255;
 uint8_t fadeOutAmount = 2; // 0-255 (0-100%)
+uint8_t sleepAnimationType = 0;
 uint16_t animationProgress = 0;
-uint8_t palIndex = 0;
+uint8_t glitter = 0;
 uint8_t sleepModePulsatingSpeed = 5;
-uint8_t sleepModeBrightness = 140;
+uint8_t sleepModeBrightness = 80;
+
 // indicates when the sensor has been triggered the last time
 long lastActiveTimestamp = 0;
 const CRGBPalette16 WaterColors1 = CRGBPalette16(0x000000, 0x000000, 0x000000, 0x000000, 
                                                     0x210048, 0x6700ff, 0x9000ff, 0x9000ff, 
                                                     0x6200e5, 0x0409bf, 0x0409bf, 0x009be9,
                                                     0x009be9, 0x00b6c1, 0x00b6c1, 0x00b6c1);
+
+const CRGBPalette16 FireColors1 = CRGBPalette16(0x000000, 0x000000, 0x000000, 0x000000, 
+                                                    0xff6900, 0xff6900, 0xff3500, 0xff3500, 
+                                                    0xff0008, 0xff0008, 0xff0008, 0xff0008,
+                                                    0xf600cc, 0xf600cc, 0xf600ff, 0xf600ff);
 
 bool blink = false;
 /********** LED CONFIG END *************/
@@ -102,7 +112,7 @@ bool blink = false;
 int SENSOR_MIN = 100;
 int SENSOR_MAX = 900;
 int inputVal = 0;
-int sensorTiggerLevel = 260;
+int sensorTiggerLevel = 560;
 int mappedSensorVal = 0;
 float distance = 0;
 int lastInputVal = 0;
@@ -118,6 +128,7 @@ Eprom eprom;
 
 long lastMsg = 0;
 char msg[50];
+char topic[50];
 int value = 0;
 
 void setup() {
@@ -141,6 +152,7 @@ void setupWifi() {
   Serial.println(); 
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
   Serial.print("Connecting to "); Serial.println(SSID1);
+  WiFi.mode(WIFI_STA);
   WiFi.begin(SSID1, WIFI_PASSWORD1);
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
   int i= 0;
@@ -148,19 +160,15 @@ void setupWifi() {
     delay(1000);
     Serial.print(".");
     i++;
-    if(i > 20) {
-      /*if(currentNetworkIndex == 0){ // try the other network
-        Serial.println("Connection could not be established, trying fallback network...");
-        currentNetworkIndex++;
-        setupWifi();
-      } else {}*/
+    /*if(i > 5) {
+      
       setColor(255, 100, 100);
       Serial.println("Connection could not be established, continue with no-internet mode...");
       delay(1000);
       FastLED.show(); 
       offlineMode = true;  
       return;
-    }
+    }*/
   }
 
   Serial.println("");
@@ -193,6 +201,12 @@ void callback(char* mqttTopic, byte* payload, unsigned int length) {
   } else if(topic.indexOf("set/fadeOutAmount") >= 0){
     fadeOutAmount = atoi(message);
     Serial.print("set fadeOutAmount "); Serial.println(fadeOutAmount);
+  } else if(topic.indexOf("set/sleepAnimationType") >= 0){
+    sleepAnimationType = atoi(message);
+    Serial.print("set sleepAnimationType "); Serial.println(sleepAnimationType);
+  } else if(topic.indexOf("set/glitter") >= 0){
+    glitter = atoi(message);
+    Serial.print("set glitter "); Serial.println(glitter);
   } else if(topic.indexOf("blink") >= 0){
     blinkStart = millis();
     Serial.println("blink!");
@@ -225,7 +239,9 @@ void subscribeToOwnTopic(const char * topic){
   client.subscribe(myTopic);
   Serial.print("Subscribing to topic:"); Serial.println(myTopic);
 }
-
+int out = 0;
+int lastOut = 0;
+long rampStart = 0;
 long loopsPerSek = 0;
 void loop() {
 
@@ -253,21 +269,31 @@ void loop() {
   client.loop();
   loopsPerSek++;
   EVERY_N_MILLISECONDS( 5000 ) { // measure performance: currently we have 37000 loops per sek
-    Serial.print("loops per sek: ");Serial.println(loopsPerSek / 5);
+    //Serial.print("loops per sek: ");Serial.print(loopsPerSek / 5); Serial.print("  input val: "); Serial.println(inputVal);
     loopsPerSek = 0;
   }
  
   EVERY_N_MILLISECONDS( 10 ) { // 100Hz sampling rate
     int rawInput = analogRead(A0);
     inputVal = lowpassFilter.input(rawInput); 
+    //Serial.print(inputVal);Serial.print(" ");Serial.print(lowpassFilter2.input(rawInput));Serial.print(" ");Serial.println(out);
     mappedSensorVal = map(inputVal, SENSOR_MIN, SENSOR_MAX, 0, 100);
     //Serial.println(rawInput);
     
     if(inputVal > sensorTiggerLevel) { // instant ON signal, is sent imediatelly
+      if(rampStart != 0 && millis() - rampStart > 100) {
+        lastOut = out;
+        out = 1;
+      }
       if(!stateOn){
+        rampStart = millis();
+        //Serial.print("stateOn. SensorTriggerLevel: "); Serial.println(sensorTiggerLevel);
+        //publishSensorVal(inputVal, 1);
+        stateOn = true;
+      }
+      if(lastOut == 0 && out == 1){
         Serial.print("stateOn. SensorTriggerLevel: "); Serial.println(sensorTiggerLevel);
         publishSensorVal(inputVal, 1);
-        stateOn = true;
       }
       sensorQ.push(inputVal);
       if(sensorQ.count() > 20){
@@ -275,8 +301,11 @@ void loop() {
       }
     } else { 
       if(stateOn){
+        out = 0;
+        rampStart = 0;
+        Serial.println("stateOff. ");
         publishSensorVal(inputVal, 0);
-        switchedOff = true;
+        justSwitchedOff = true;
         stateOn = false;
       }
     }
@@ -287,7 +316,7 @@ void loop() {
     if(stateOn){
       rainbow(mapVal(inputVal));
       lastActiveTimestamp = millis();
-    } else if(switchedOff){ 
+    } else if(justSwitchedOff){ 
       int max = getMaxQVal(sensorQ);
       //Serial.print("stateOff maxVal: ");Serial.print(max); Serial.print(" currentVal:"); Serial.println(inputVal);
       rainbow(mapVal(max));
@@ -296,11 +325,10 @@ void loop() {
     }
     darken(fadeOutAmount);
 
-    //setColor(0, 0, 30);
-    //static uint8_t startIndex = 0;
-    //startIndex = startIndex + 1;
-    //fillLEDsFromPaletteColors( startIndex);
-    //FastLED.show(); // display this frame
+    if(glitter > 0) {
+      addGlitter(glitter);
+    }
+
     if(brightness != FastLED.getBrightness()){
       Serial.print("set brightness to "); Serial.println(brightness);
       FastLED.setBrightness(brightness);
@@ -311,9 +339,14 @@ void loop() {
       } else {
         blinkStart = 0;
       }
+      publishSensorVal(10000, 1);
     }
     FastLED.show(); // display this frame
-    switchedOff = false;
+    justSwitchedOff = false;
+  }
+  
+  EVERY_N_MILLISECONDS( 250 ) { 
+    publishDebug(inputVal);
   }
 }
 
@@ -324,6 +357,24 @@ int mapVal(int inputVal){
 void publishSensorVal(int sensorVal, int trigger) {
   // k: mac address of sensor, v: sensor value, s: above (1) or below trigger level (0)
   snprintf (msg, 75, "{\"k\":\"%s\",\"v\":\"%d\",\"s\":%d}", macAddress, sensorVal, trigger);
+  //Serial.println(msg);
+  if(!offlineMode){
+    client.publish(MQTT_TOPIC, msg);
+    client.loop();
+  }
+}
+
+void publishDebug(int sensorVal) {
+  snprintf (topic, 75, "sensorInfo/%s", macAddress);
+  snprintf (msg, 75, "%d", sensorVal);
+  if(!offlineMode){
+    client.publish(topic, msg);
+    client.loop();
+  }
+}
+
+void publishEcho() {
+  snprintf (msg, 75, "{\"k\":\"%s\",\"v\":\"echo\"}", macAddress);
   Serial.println(msg);
   if(!offlineMode){
     client.publish(MQTT_TOPIC, msg);

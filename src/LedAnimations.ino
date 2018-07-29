@@ -55,25 +55,32 @@ void randomRing(){
   fillRing(4, random(0,255), random(0,255), random(0,255));
 }
 
-
+uint8_t palIndex = 0;
 void pulsate(){
   animationProgress = (animationProgress + sleepModePulsatingSpeed) % 10000;
   palIndex = triwave8(map(animationProgress, 0, 10000, 0, 255));
-  fillRing(0, 0, 0, palIndex);
-  int ring = 4; // 4th ring == bottom ring
-  int add = 0;
-  for(uint8_t i = ring * LEDS_PER_RING; i < ring * LEDS_PER_RING + LEDS_PER_RING; i++){
-    leds[i] = ColorFromPalette(WaterColors1, palIndex + add, sleepModeBrightness, LINEARBLEND);
-    add++;
+
+  if(sleepAnimationType == 0) {
+    fillRing(0, 0, 0, palIndex);
+    fillRingFromPalette(4, palIndex, WaterColors1);
+  } else if(sleepAnimationType == 1) {
+    fillRing(0, palIndex, 0, 0);
+    fillRingFromPalette(4, palIndex, FireColors1);
   }
-  //fillRing(4, color);
-  //darken(255-sleepModeBrightness);
 }
 
-void fillRing(int index, CRGB color) {
+void fillRing(uint8_t index, CRGB color) {
   for(uint8_t i = index * LEDS_PER_RING; i < index * LEDS_PER_RING + LEDS_PER_RING; i++){
     leds[i] = color;
   }
+}
+
+void fillRingFromPalette(uint8_t ringIndex, uint8_t palIndex, const CRGBPalette16 & palette) {
+  int add = 0;
+  for(uint8_t i = ringIndex * LEDS_PER_RING; i < ringIndex * LEDS_PER_RING + LEDS_PER_RING; i++){
+      leds[i] = ColorFromPalette(palette, palIndex + add, sleepModeBrightness, LINEARBLEND);
+      add++;
+    }
 }
 
 void fillRing(int index, int inR, int inG, int inB) {
@@ -83,6 +90,14 @@ void fillRing(int index, int inR, int inG, int inB) {
     leds[i].blue  = inB;
   }
 }
+
+void addGlitter( fract8 chanceOfGlitter) 
+{
+  if( random8() < chanceOfGlitter) {
+    leds[ random16(NUM_LEDS) ] += CRGB::White;
+  }
+}
+
 
 void setColor(int inR, int inG, int inB) {
   for (int i = 0; i < NUM_LEDS; i++) {

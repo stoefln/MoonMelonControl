@@ -44,16 +44,7 @@ FASTLED_USING_NAMESPACE
 const char* SSID1 = "MoonMelonField";
 const char* WIFI_PASSWORD1 = "moonsalon";
 const char* MQTT_SERVER_IP1 = "192.168.1.10";
-const char* SSID2 = "Chaos-Platz";
-const char* WIFI_PASSWORD2 = "FalafelPower69";
-const char* MQTT_SERVER_IP2 = "192.168.0.73";
-// const char* SSID1 = "GoldenOnion";
-// const char* WIFI_PASSWORD1 = "blackstar";
-// const char* MQTT_SERVER_IP1 = "192.168.43.62";
 
-//const char* SSID2 = "UPC1374847";
-//const char* WIFI_PASSWORD2 = "HHYPUMFP";
-//const char* MQTT_SERVER_IP2 = "192.168.0.27";
 char macAddress[20];
 long lastReconnectAttempt = 0;
 bool offlineMode = false;

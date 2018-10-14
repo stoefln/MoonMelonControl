@@ -1,13 +1,16 @@
 # Moon Melon Control
 **Software for the moon melon control smart light bulb**
-
+<table><tr><td>
 It runs on a NodeMcu v3 and was used to power an art installation called "Moon Melon Field". The installation is consisting of 25 lamps hanging in the air around 3m above ground.
 Each of the lamp has a LED strip (60pixels), a sensor, reporting people's movement below the lamps over a MQTT broker to python program which in turn triggers sounds.
 
 The lamps in turn can be controlled (brightness, type of animation, sensor threshhold...) over a set of commands which can be sent over MQTT.
-
+</td><td>
+  
 To get a better understanding check out the [documentation of the project here](http://lab.stephanpetzl.com/index.php?/projects/moon-melon-field/)
-<img width="50%" alt="Moon Melon Field installation at Nowhere 2018" src="http://dev.stephanpetzl.com/i.php?/000/237/IMG-1048,medium.2x.1531383328.JPG"/>
+<img align="right" margin="30" alt="Moon Melon Field installation at Nowhere 2018" src="http://dev.stephanpetzl.com/i.php?/000/237/IMG-1048,medium.2x.1531383328.JPG"/>
+
+</td></tr></table>
 
 ## How to run it
 

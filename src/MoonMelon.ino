@@ -41,9 +41,9 @@ FASTLED_USING_NAMESPACE
 #endif
 
 /********** WIFI *************/
-const char* SSID1 = "MoonMelonField";
-const char* WIFI_PASSWORD1 = "moonsalon";
-const char* MQTT_SERVER_IP1 = "192.168.1.10";
+const char* SSID1 = "StromSalon";
+const char* WIFI_PASSWORD1 = "Wielecker4elektrobrote";
+const char* MQTT_SERVER_IP1 = "192.168.0.80";
 
 char macAddress[20];
 long lastReconnectAttempt = 0;
@@ -101,7 +101,7 @@ bool blink = false;
 
 /********** SENSOR *************/
 int SENSOR_MIN = 100;
-int SENSOR_MAX = 900;
+int SENSOR_MAX = 700;
 int inputVal = 0;
 int sensorTiggerLevel = 560;
 int mappedSensorVal = 0;
@@ -126,11 +126,7 @@ void setup() {
   eprom.begin();
   Serial.begin(9600);
   setupWifi();
-  if(currentNetworkIndex == 0){
-    client.setServer(MQTT_SERVER_IP1, 1883);
-  } else {
-    client.setServer(MQTT_SERVER_IP2, 1883);
-  }
+  client.setServer(MQTT_SERVER_IP1, 1883);
   client.setCallback(callback);
 
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
@@ -151,7 +147,7 @@ void setupWifi() {
     delay(1000);
     Serial.print(".");
     i++;
-    /*if(i > 5) {
+    if(i > 5) {
       
       setColor(255, 100, 100);
       Serial.println("Connection could not be established, continue with no-internet mode...");
@@ -159,7 +155,7 @@ void setupWifi() {
       FastLED.show(); 
       offlineMode = true;  
       return;
-    }*/
+    }
   }
 
   Serial.println("");

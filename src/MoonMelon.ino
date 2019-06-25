@@ -41,9 +41,9 @@ FASTLED_USING_NAMESPACE
 #endif
 
 /********** WIFI *************/
-const char* SSID1 = "StromSalon";
-const char* WIFI_PASSWORD1 = "Wielecker4elektrobrote";
-const char* MQTT_SERVER_IP1 = "192.168.0.80";
+const char* SSID1 = "MoonMelonField";
+const char* WIFI_PASSWORD1 = "moonsalon";
+const char* MQTT_SERVER_IP1 = "192.168.0.10";
 
 char macAddress[20];
 long lastReconnectAttempt = 0;
